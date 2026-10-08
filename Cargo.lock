@@ -905,6 +905,7 @@ dependencies = [
  "owo-colors",
  "reqwest",
  "serde",
+ "serde_json",
  "tabled",
  "terminal_size",
  "tokio",

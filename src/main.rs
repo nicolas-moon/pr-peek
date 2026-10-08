@@ -30,6 +30,10 @@ struct Args {
     /// GitHub token. Falls back to GITHUB_TOKEN.
     #[arg(long, env = "GITHUB_TOKEN", hide_env_values = true)]
     token: Option<String>,
+
+    /// Print raw JSON instead of the formatted table.
+    #[arg(long)]
+    json: bool,
 }
 
 const GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
@@ -99,7 +103,7 @@ struct PageInfo {
     end_cursor: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PullRequest {
     number: u64,
@@ -115,7 +119,7 @@ struct PullRequest {
     merge_queue_entry: Option<MergeQueueEntry>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum ReviewDecision {
     Approved,
@@ -123,13 +127,13 @@ enum ReviewDecision {
     ReviewRequired,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MergeQueueEntry {
     position: u64,
     state: MergeQueueState,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum MergeQueueState {
     AwaitingChecks,
@@ -164,6 +168,21 @@ struct PrRow {
     draft: String,
     review: String,
     queue: String,
+}
+
+/// Shape of `--json` output: the query context plus the raw PR data.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonOutput<'a> {
+    owner: &'a str,
+    repo: &'a str,
+    user: &'a str,
+    pull_requests: &'a [PullRequest],
+}
+
+/// The server-side search filter. `author:` matching is case-insensitive.
+fn search_query(owner: &str, repo: &str, user: &str) -> String {
+    format!("repo:{owner}/{repo} is:pr is:open author:{user}")
 }
 
 fn github_token(cli_token: Option<&str>) -> Option<String> {
@@ -287,10 +306,7 @@ async fn main() -> Result<()> {
         "a GitHub token is required: pass --token, set GITHUB_TOKEN, or run `gh auth login`",
     )?;
 
-    let search = format!(
-        "repo:{}/{} is:pr is:open author:{}",
-        args.owner, args.repo, args.user
-    );
+    let search = search_query(&args.owner, &args.repo, &args.user);
 
     let mut after: Option<String> = None;
     let mut matching_prs = Vec::new();
@@ -335,6 +351,23 @@ async fn main() -> Result<()> {
             (true, Some(cursor)) => after = Some(cursor),
             _ => break,
         }
+    }
+
+    // Machine-readable mode: dump the raw data and skip all table styling.
+    // An empty result still prints valid JSON (with an empty list).
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&JsonOutput {
+                owner: &args.owner,
+                repo: &args.repo,
+                user: &args.user,
+                pull_requests: &matching_prs,
+            })
+            .context("failed to encode JSON output")?
+        );
+
+        return Ok(());
     }
 
     if matching_prs.is_empty() {
@@ -407,4 +440,182 @@ async fn main() -> Result<()> {
     println!("{table}");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE_RESPONSE: &str = r#"{
+      "data": {
+        "search": {
+          "pageInfo": { "hasNextPage": true, "endCursor": "cursor-2" },
+          "nodes": [
+            {
+              "number": 12345,
+              "title": "Fix off-by-one in scanner",
+              "url": "https://github.com/rust-lang/rust/pull/12345",
+              "isDraft": false,
+              "headRefName": "ferris/fix-scanner",
+              "baseRefName": "master",
+              "reviewDecision": "APPROVED",
+              "mergeQueueEntry": { "position": 2, "state": "AWAITING_CHECKS" }
+            },
+            {
+              "number": 12350,
+              "title": "WIP: refactor lexer",
+              "url": "https://github.com/rust-lang/rust/pull/12350",
+              "isDraft": true,
+              "headRefName": "ferris/lexer-refactor",
+              "baseRefName": "master",
+              "reviewDecision": null,
+              "mergeQueueEntry": null
+            },
+            {
+              "number": 12351,
+              "title": "Add new feature",
+              "url": "https://github.com/rust-lang/rust/pull/12351",
+              "isDraft": false,
+              "headRefName": "ferris/feature",
+              "baseRefName": "master",
+              "reviewDecision": "CHANGES_REQUESTED",
+              "mergeQueueEntry": { "position": 1, "state": "FUTURE_STATE" }
+            }
+          ]
+        }
+      },
+      "errors": []
+    }"#;
+
+    #[test]
+    fn decodes_graphql_response() {
+        let GraphQlResponse { data, errors } =
+            serde_json::from_str::<GraphQlResponse>(SAMPLE_RESPONSE).unwrap();
+
+        assert!(errors.is_empty());
+        let SearchData { search } = data.unwrap();
+        assert!(search.page_info.has_next_page);
+        assert_eq!(search.page_info.end_cursor.as_deref(), Some("cursor-2"));
+        assert_eq!(search.nodes.len(), 3);
+
+        let pr = &search.nodes[0];
+        assert_eq!(pr.number, 12345);
+        assert_eq!(pr.review_decision, Some(ReviewDecision::Approved));
+        let queue = pr.merge_queue_entry.as_ref().unwrap();
+        assert_eq!(queue.position, 2);
+        assert_eq!(queue.state, MergeQueueState::AwaitingChecks);
+
+        // null review/queue fields decode to None
+        assert_eq!(search.nodes[1].review_decision, None);
+        assert!(search.nodes[1].merge_queue_entry.is_none());
+        assert!(search.nodes[1].is_draft);
+
+        // unknown queue states degrade to Unknown instead of failing
+        let state = search.nodes[2].merge_queue_entry.as_ref().unwrap().state;
+        assert_eq!(state, MergeQueueState::Unknown);
+    }
+
+    #[test]
+    fn decodes_graphql_errors() {
+        let response: GraphQlResponse = serde_json::from_str(
+            r#"{ "data": null, "errors": [ { "message": "Bad thing happened" } ] }"#,
+        )
+        .unwrap();
+
+        assert!(response.data.is_none());
+        assert_eq!(response.errors.len(), 1);
+        assert_eq!(response.errors[0].message, "Bad thing happened");
+    }
+
+    #[test]
+    fn search_query_filters_server_side() {
+        assert_eq!(
+            search_query("rust-lang", "rust", "ferris"),
+            "repo:rust-lang/rust is:pr is:open author:ferris"
+        );
+    }
+
+    #[test]
+    fn cli_token_is_trimmed() {
+        assert_eq!(
+            github_token(Some("  ghp_test  ")).as_deref(),
+            Some("ghp_test")
+        );
+    }
+
+    #[test]
+    fn review_cells_match_decisions() {
+        let palette = Palette::plain();
+        assert!(palette.review_cell(None).is_empty());
+        assert!(
+            palette
+                .review_cell(Some(ReviewDecision::Approved))
+                .contains("✓ approved")
+        );
+        assert!(
+            palette
+                .review_cell(Some(ReviewDecision::ChangesRequested))
+                .contains("✗ changes requested")
+        );
+        assert!(
+            palette
+                .review_cell(Some(ReviewDecision::ReviewRequired))
+                .contains("○ review required")
+        );
+    }
+
+    #[test]
+    fn queue_cells_match_states() {
+        let palette = Palette::plain();
+        assert!(palette.queue_cell(None).is_empty());
+
+        let entry = MergeQueueEntry {
+            position: 3,
+            state: MergeQueueState::Mergeable,
+        };
+        assert!(palette.queue_cell(Some(&entry)).contains("#3 mergeable"));
+    }
+
+    #[test]
+    fn queue_state_display() {
+        assert_eq!(
+            MergeQueueState::AwaitingChecks.to_string(),
+            "awaiting checks"
+        );
+        assert_eq!(MergeQueueState::Locked.to_string(), "locked");
+        assert_eq!(MergeQueueState::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn hyperlink_embeds_osc8_sequence() {
+        let link = hyperlink("https://example.com/pull/1", "open ↗");
+        assert!(link.starts_with("\x1b]8;;https://example.com/pull/1\x1b\\"));
+        assert!(link.ends_with("open ↗\x1b]8;;\x1b\\"));
+    }
+
+    #[test]
+    fn json_output_uses_camel_case_keys() {
+        let pr = PullRequest {
+            number: 1,
+            title: "title".to_owned(),
+            url: "https://example.com/pull/1".to_owned(),
+            is_draft: false,
+            head_ref_name: "head".to_owned(),
+            base_ref_name: "base".to_owned(),
+            review_decision: None,
+            merge_queue_entry: None,
+        };
+
+        let out = JsonOutput {
+            owner: "owner",
+            repo: "repo",
+            user: "user",
+            pull_requests: std::slice::from_ref(&pr),
+        };
+        let rendered = serde_json::to_string(&out).unwrap();
+
+        assert!(rendered.contains(r#""pullRequests""#));
+        assert!(rendered.contains(r#""headRefName":"head""#));
+        assert!(rendered.contains(r#""reviewDecision":null"#));
+    }
 }

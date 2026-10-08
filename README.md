@@ -64,6 +64,12 @@ For example:
 pr-peek rust-lang rust ferris
 ```
 
+Add `--json` for machine-readable output (the raw PR data as pretty-printed JSON, including review and merge queue fields) — handy for scripts and pipelines:
+
+```sh
+pr-peek rust-lang rust ferris --json
+```
+
 ### Authentication
 
 pr-peek uses GitHub's GraphQL API (the only place review decisions and merge queue state are exposed), which requires authentication. Credentials are looked up in this order:
