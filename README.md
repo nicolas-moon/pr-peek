@@ -30,11 +30,11 @@ Open PRs from ferris in rust-lang/rust:
 
 ### Prebuilt binaries
 
-Each [GitHub release](https://github.com/nickmoon-circuit/pr-peek/releases) ships archives for
+Each [GitHub release](https://github.com/nicolas-moon/pr-peek/releases) ships archives for
 macOS (Apple Silicon and Intel) and Linux (x86_64 and aarch64), plus an installer script:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nickmoon-circuit/pr-peek/releases/latest/download/pr-peek-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/nicolas-moon/pr-peek/releases/latest/download/pr-peek-installer.sh | sh
 ```
 
 Or download the `pr-peek-<target>.tar.xz` for your platform from the release page and put the
@@ -45,7 +45,7 @@ binary somewhere on your `PATH`.
 Requires [Rust](https://www.rust-lang.org/tools/install) (2024 edition toolchain).
 
 ```sh
-git clone https://github.com/nickmoon-circuit/pr-peek.git
+git clone https://github.com/nicolas-moon/pr-peek.git
 cd pr-peek
 cargo install --path .
 ```
@@ -96,6 +96,8 @@ just release-tag 0.2.0
 
 The workflow's plan step also runs on pull requests, so a broken release config surfaces before you tag. After editing `dist-workspace.toml`, run `just dist-generate` to refresh the workflow file.
 
+macOS binaries are signed with a Developer ID certificate using the `CODESIGN_IDENTITY`, `CODESIGN_CERTIFICATE`, and `CODESIGN_CERTIFICATE_PASSWORD` repository secrets; if those are missing the release still builds but ships an unsigned macOS binary.
+
 ## License
 
-No license file yet — treat as all rights reserved until one is added.
+Released under the [MIT License](LICENSE).
