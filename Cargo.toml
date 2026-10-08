@@ -1,6 +1,6 @@
 [package]
 name = "pr-peek"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "List a GitHub user's open PRs in a repository, with review and merge queue status"
 repository = "https://github.com/nicolas-moon/pr-peek"
