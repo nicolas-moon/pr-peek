@@ -23,3 +23,8 @@ github-attestations = true
 # Requires CODESIGN_IDENTITY, CODESIGN_CERTIFICATE, and
 # CODESIGN_CERTIFICATE_PASSWORD repository secrets.
 macos-sign = true
+
+# The legacy macos-14 (Sonoma) runner's `security import` rejects modern
+# OpenSSL-generated PKCS#12 files ("MAC verification failed") even with the
+# correct password; macos-15 (Sequoia) imports them fine.
+github-custom-runners = { "aarch64-apple-darwin" = "macos-15" }
