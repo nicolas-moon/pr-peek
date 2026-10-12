@@ -15,8 +15,7 @@ use tabled::{
 };
 
 #[derive(Parser)]
-#[command(name = "pr-scout")]
-#[command(about = "List a GitHub user's open PRs in a repository")]
+#[command(version, about = "List a GitHub user's open PRs in a repository")]
 struct Args {
     /// Repository owner, such as rust-lang
     owner: String,
