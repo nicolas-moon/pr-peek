@@ -15,7 +15,18 @@ use tabled::{
 };
 
 #[derive(Parser)]
-#[command(version, about = "List a GitHub user's open PRs in a repository")]
+#[command(
+    version = concat!(
+        env!("CARGO_PKG_VERSION"),
+        " (",
+        env!("BUILD_COMMIT"),
+        ")\n  target: ",
+        env!("BUILD_TARGET"),
+        "\n  rustc:  ",
+        env!("BUILD_RUSTC"),
+    ),
+    about = "List a GitHub user's open PRs in a repository",
+)]
 struct Args {
     /// Repository owner, such as rust-lang
     owner: String,
