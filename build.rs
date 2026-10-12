@@ -45,8 +45,15 @@ fn main() {
     };
     println!("cargo:rustc-env=BUILD_COMMIT={commit}");
 
-    // Re-run when the sources change so the metadata tracks what the binary
-    // actually contains.
+    // Re-run when the sources or the repository state change, so the
+    // metadata tracks what the binary actually contains.
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/main.rs");
+    if let Ok(head) = std::fs::read_to_string(".git/HEAD") {
+        println!("cargo:rerun-if-changed=.git/HEAD");
+        println!("cargo:rerun-if-changed=.git/index");
+        if let Some(refs) = head.trim().strip_prefix("ref: ") {
+            println!("cargo:rerun-if-changed=.git/{refs}");
+        }
+    }
 }
