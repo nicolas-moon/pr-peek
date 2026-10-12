@@ -90,6 +90,19 @@ For private repos, the token needs `repo` scope (classic) or read access to pull
 
 Checking "does so-and-so have any PRs open on this repo right now" usually means opening GitHub, filtering by author, and squinting at a list. pr-peek turns that into a single command you can run before standup, in a script, or as part of a review-rotation check.
 
+## Tern plugin
+
+If you use the [Tern](https://github.com/stencil-hq/tern-sdk) terminal, this repo ships a plugin that renders pr-peek's output natively instead of as plain text: a styled table of the PRs with toned review and merge-queue cells, summary chips, and clickable `#N` and `open ↗` links.
+
+From a checkout of this repo (the plugin lives in `tern/`):
+
+```sh
+tern plugin link /path/to/pr-peek/tern
+tern plugin reload
+```
+
+The plugin hooks shell spawning and sets `PR_PEEK_JSON=1` in every new Tern pane, so pr-peek run in those panes automatically prints the JSON the lens renders — no changes to your shell environment needed. Panes opened before the plugin was loaded don't have the variable; run `pr-peek … --json` there instead (or `export PR_PEEK_JSON=1`). If the output ever isn't JSON — an older binary, an error message — the lens steps aside and shows the raw text.
+
 ## Releasing
 
 Releases are built by [dist](https://axodotdev.github.io/cargo-dist/) via `.github/workflows/release.yml`. Pushing a tag like `v0.2.0` builds binaries for every target in `dist-workspace.toml`, creates a GitHub release, and attaches the archives, checksums, and installer script.

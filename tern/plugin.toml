@@ -1,0 +1,13 @@
+schema = 1
+id = "pr-peek"
+name = "PR Peek"
+version = "0.1.0"
+description = "Native view for pr-peek output: a styled table of a user's open PRs with review and merge queue status."
+icon = "merge"
+host = "plugin/host.luau"
+
+# Claim every `pr-peek ...` invocation. The host sets PR_PEEK_JSON=1 in each
+# new shell so pr-peek emits JSON, which the lens renders as a native table.
+[[lenses]]
+id = "pr-peek"
+match = ["pr-peek", "pr-peek *"]

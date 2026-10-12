@@ -31,8 +31,15 @@ struct Args {
     #[arg(long, env = "GITHUB_TOKEN", hide_env_values = true)]
     token: Option<String>,
 
-    /// Print raw JSON instead of the formatted table.
-    #[arg(long)]
+    /// Print raw JSON instead of the formatted table. Also enabled by
+    /// PR_PEEK_JSON=1, which the Tern plugin sets so its lens can render
+    /// the data natively.
+    #[arg(
+        long,
+        env = "PR_PEEK_JSON",
+        action = clap::ArgAction::SetTrue,
+        value_parser = clap::builder::BoolishValueParser::new()
+    )]
     json: bool,
 }
 
