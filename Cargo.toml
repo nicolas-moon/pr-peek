@@ -1,6 +1,6 @@
 [package]
 name = "pr-peek"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.85"
 description = "List a GitHub user's open PRs in a repository, with review and merge queue status"
