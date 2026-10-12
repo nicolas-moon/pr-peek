@@ -25,6 +25,7 @@ Open PRs from ferris in rust-lang/rust:
 - **Handles pagination** — walks every page of results, so it works on repos with hundreds of open PRs.
 - **Case-insensitive matching** — `ferris`, `Ferris`, and `FERRIS` all match the same user.
 - **Readable output** — a clean, aligned table instead of raw JSON, with color and clickable links in a terminal.
+- **Self-update** — `pr-peek update` fetches the latest release, verifies its published checksum, and replaces the binary in place.
 
 ## Install
 
@@ -51,6 +52,16 @@ cargo install --path .
 ```
 
 This installs the `pr-peek` binary to `~/.cargo/bin` (make sure that's on your `PATH`).
+
+### Updating
+
+An installed binary can update itself:
+
+```sh
+pr-peek update
+```
+
+This checks the [latest GitHub release](https://github.com/nicolas-moon/pr-peek/releases), verifies the archive against its published SHA-256 checksum, and replaces the running binary in place. No token is needed (the releases API is public). It works for binaries installed with the installer script or `cargo install`; if the binary lives in a directory you don't own (e.g. `/usr/local/bin`), re-run with `sudo`.
 
 ## Usage
 
