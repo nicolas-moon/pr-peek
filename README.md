@@ -2,25 +2,28 @@
 
 A fast, opinionated CLI for checking who has open pull requests where — no browser tabs required.
 
-Point it at a repo and a GitHub username, and get back a clean table of every open PR that person has in flight: number, title, branch flow, link, draft status, review decision, and merge queue position.
+Point it at a repo and a GitHub username — or just run it inside a checkout — and get back a clean table of every open PR that person has in flight: number, title, branch flow, link, draft status, review decision, CI checks, and merge queue position. Flip it around with `--reviewing` to see the PRs waiting on their review instead.
 
 ```
 $ pr-peek rust-lang rust ferris
 
 Open PRs from ferris in rust-lang/rust:
 
-╭────────┬───────────────────────────┬─────────────────────────────────┬──────────────────────────────────────────────┬───────┬───────────────────┬────────────────────╮
-│ number │ title                     │ branch                          │ link                                         │ draft │ review            │ queue              │
-├────────┼───────────────────────────┼─────────────────────────────────┼──────────────────────────────────────────────┼───────┼───────────────────┼────────────────────┤
-│ #12345 │ Fix off-by-one in scanner │ ferris/fix-scanner → master     │ https://github.com/rust-lang/rust/pull/12345 │       │ ✓ approved        │ #2 awaiting checks │
-│ #12350 │ WIP: refactor lexer       │ ferris/lexer-refactor → master  │ https://github.com/rust-lang/rust/pull/12350 │ ✓     │ ○ review required │                    │
-╰────────┴───────────────────────────┴─────────────────────────────────┴──────────────────────────────────────────────┴───────┴───────────────────┴────────────────────╯
+╭────────┬───────────────────────────┬────────────────────────────────┬──────────────────────────────────────────────┬───────┬───────────────────┬───────────┬────────────────────╮
+│ number │ title                     │ branch                         │ link                                         │ draft │ review            │ checks    │ queue              │
+├────────┼───────────────────────────┼────────────────────────────────┼──────────────────────────────────────────────┼───────┼───────────────────┼───────────┼────────────────────┤
+│ #12345 │ Fix off-by-one in scanner │ ferris/fix-scanner → master    │ https://github.com/rust-lang/rust/pull/12345 │       │ ✓ approved        │ ✓ passing │ #2 awaiting checks │
+│ #12350 │ WIP: refactor lexer       │ ferris/lexer-refactor → master │ https://github.com/rust-lang/rust/pull/12350 │ ✓     │ ○ review required │ ✗ failing │                    │
+╰────────┴───────────────────────────┴────────────────────────────────┴──────────────────────────────────────────────┴───────┴───────────────────┴───────────┴────────────────────╯
 ```
 
 ## Features
 
 - **Review status** — shows GitHub's overall review decision for each PR: `✓ approved`, `○ review required`, or `✗ changes requested`. Blank when the repo has no required-review rule and nobody has reviewed yet.
+- **CI checks** — the combined status of each PR's latest commit: `✓ passing`, `✗ failing`, or `● pending`. Blank when the commit has no checks or statuses.
 - **Merge queue position** — if a PR is sitting in a [merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue), shows its position and state (`#3 queued`, `#1 awaiting checks`, `#1 mergeable`, `unmergeable`, `locked`).
+- **Review queue** — `--reviewing` lists open PRs waiting on the user's review (requested directly or through a team), with an `author` column.
+- **Smart defaults** — run it inside a checkout and it picks the repo from your git remote; leave out the user and it shows your own PRs.
 - **Zero-config auth** — reuses your `gh` CLI token automatically, or set `GITHUB_TOKEN` yourself.
 - **Handles pagination** — walks every page of results, so it works on repos with hundreds of open PRs.
 - **Case-insensitive matching** — `ferris`, `Ferris`, and `FERRIS` all match the same user.
@@ -66,16 +69,28 @@ This checks the [latest GitHub release](https://github.com/nicolas-moon/pr-peek/
 ## Usage
 
 ```sh
-pr-peek <owner> <repo> <user>
+pr-peek [<owner> <repo>] [<user>]
 ```
 
 For example:
 
 ```sh
-pr-peek rust-lang rust ferris
+pr-peek rust-lang rust ferris   # ferris's PRs in rust-lang/rust
+pr-peek rust-lang rust          # your PRs in rust-lang/rust
+pr-peek ferris                  # ferris's PRs in the current checkout's repo
+pr-peek                         # your PRs in the current checkout's repo
 ```
 
-Add `--json` for machine-readable output (the raw PR data as pretty-printed JSON, including review and merge queue fields) — handy for scripts and pipelines:
+Without `<owner> <repo>`, pr-peek reads the repository from the current directory's git remotes: `upstream` first (in a fork, that's where your PRs live), then `origin`. The remote must point at github.com. Without `<user>`, it lists PRs for the account that owns the token.
+
+Add `--reviewing` (`-r`) to list the open PRs awaiting the user's review instead of the ones they opened:
+
+```sh
+pr-peek -r                      # PRs waiting on your review here
+pr-peek rust-lang rust ferris -r
+```
+
+Add `--json` for machine-readable output (the raw PR data as pretty-printed JSON, including author, review, CI check, and merge queue fields, plus a `role` of `author` or `reviewRequested`) — handy for scripts and pipelines:
 
 ```sh
 pr-peek rust-lang rust ferris --json
@@ -99,11 +114,11 @@ For private repos, the token needs `repo` scope (classic) or read access to pull
 
 ## Why
 
-Checking "does so-and-so have any PRs open on this repo right now" usually means opening GitHub, filtering by author, and squinting at a list. pr-peek turns that into a single command you can run before standup, in a script, or as part of a review-rotation check.
+Checking "does so-and-so have any PRs open on this repo right now" usually means opening GitHub, filtering by author, and squinting at a list. pr-peek turns that into a single command you can run before standup, in a script, or as part of a review-rotation check (`pr-peek -r`).
 
 ## Tern plugin
 
-If you use the [Tern](https://github.com/stencil-hq/tern-sdk) terminal, this repo ships a plugin that renders pr-peek's output natively instead of as plain text: a styled table of the PRs with toned review and merge-queue cells, summary chips, and clickable `#N` and `open ↗` links.
+If you use the [Tern](https://github.com/stencil-hq/tern-sdk) terminal, this repo ships a plugin that renders pr-peek's output natively instead of as plain text: a styled table of the PRs with toned review, CI check, and merge-queue cells (plus an author column for `--reviewing`), summary chips, and clickable `#N` and `open ↗` links.
 
 From a checkout of this repo (the plugin lives in `tern/`):
 

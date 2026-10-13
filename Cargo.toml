@@ -3,7 +3,7 @@ name = "pr-peek"
 version = "0.4.0"
 edition = "2024"
 rust-version = "1.85"
-description = "List a GitHub user's open PRs in a repository, with review and merge queue status"
+description = "List a GitHub user's open PRs in a repository, with review, CI, and merge queue status"
 repository = "https://github.com/nicolas-moon/pr-peek"
 
 [dependencies]

@@ -2,7 +2,7 @@ schema = 1
 id = "pr-peek"
 name = "PR Peek"
 version = "0.1.0"
-description = "Native view for pr-peek output: a styled table of a user's open PRs with review and merge queue status."
+description = "Native view for pr-peek output: a styled table of open PRs with review, CI check, and merge queue status."
 icon = "merge"
 host = "plugin/host.luau"
 
