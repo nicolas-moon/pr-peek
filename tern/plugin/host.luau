@@ -20,12 +20,15 @@ type Pr = {
 	title: string,
 	url: string,
 	isDraft: boolean?,
+	author: string?,
 	headRefName: string,
 	baseRefName: string,
 	reviewDecision: string?,
+	checkStatus: string?,
 	mergeQueueEntry: Entry?,
 }
-type Output = { owner: string, repo: string, user: string, pullRequests: { Pr } }
+-- role is "author" or "reviewRequested"; older pr-peek omits it (author).
+type Output = { owner: string, repo: string, user: string, role: string?, pullRequests: { Pr } }
 
 type State = {
 	run: LensRun,
@@ -75,6 +78,14 @@ local QUEUE_STYLE: { [string]: string } = {
 	UNMERGEABLE = "error strong",
 }
 
+local CHECKS: { [string]: { t: string, s: string } } = {
+	SUCCESS = { t = "✓ passing", s = "success strong" },
+	FAILURE = { t = "✗ failing", s = "error strong" },
+	ERROR = { t = "✗ failing", s = "error strong" },
+	PENDING = { t = "● pending", s = "warning strong" },
+	EXPECTED = { t = "● pending", s = "warning strong" },
+}
+
 local function blank(): Span
 	return ui.span("—", "muted")
 end
@@ -85,6 +96,18 @@ local function reviewCell(pr: Pr): Cell
 		return blank()
 	end
 	return ui.span(r.t, r.s)
+end
+
+local function checksCell(pr: Pr): Cell
+	local status = pr.checkStatus
+	if status == nil then
+		return blank()
+	end
+	local c = CHECKS[status]
+	if c == nil then
+		return ui.span("? unknown", "warning strong")
+	end
+	return ui.span(c.t, c.s)
 end
 
 local function queueCell(pr: Pr): Cell
@@ -120,7 +143,7 @@ local function plural(n: number, word: string): string
 end
 
 local function summary(prs: { Pr }): Node
-	local approved, changes, required, draft, queued = 0, 0, 0, 0, 0
+	local approved, changes, required, draft, queued, failing = 0, 0, 0, 0, 0, 0
 	for _, pr in prs do
 		if pr.reviewDecision == "APPROVED" then
 			approved += 1
@@ -135,6 +158,9 @@ local function summary(prs: { Pr }): Node
 		if pr.mergeQueueEntry ~= nil then
 			queued += 1
 		end
+		if pr.checkStatus == "FAILURE" or pr.checkStatus == "ERROR" then
+			failing += 1
+		end
 	end
 
 	local chips = { ui.badge(plural(#prs, "open PR"), "accent") }
@@ -147,6 +173,9 @@ local function summary(prs: { Pr }): Node
 	if required > 0 then
 		table.insert(chips, ui.badge(`{required} review required`, "warning"))
 	end
+	if failing > 0 then
+		table.insert(chips, ui.badge(`{failing} failing checks`, "error"))
+	end
 	if queued > 0 then
 		table.insert(chips, ui.badge(`{queued} in merge queue`, "info"))
 	end
@@ -158,18 +187,27 @@ end
 
 -- View -----------------------------------------------------------------------
 
-local COLS: { Col } = {
-	{ id = "number", head = "#", priority = 10 },
-	{ id = "title", head = "Title", priority = 9, grow = 1, truncate = "end" },
-	{ id = "review", head = "Review", priority = 8 },
-	{ id = "queue", head = "Merge queue", priority = 7 },
-	{ id = "branch", head = "Branch", priority = 6, truncate = "middle" },
-	{ id = "open", head = "", priority = 5 },
-}
+local function columns(showAuthor: boolean): { Col }
+	local cols: { Col } = {
+		{ id = "number", head = "#", priority = 10 },
+		{ id = "title", head = "Title", priority = 9, grow = 1, truncate = "end" },
+	}
+	if showAuthor then
+		table.insert(cols, { id = "author", head = "Author", priority = 8 })
+	end
+	table.insert(cols, { id = "review", head = "Review", priority = 8 })
+	table.insert(cols, { id = "checks", head = "Checks", priority = 8 })
+	table.insert(cols, { id = "queue", head = "Merge queue", priority = 7 })
+	table.insert(cols, { id = "branch", head = "Branch", priority = 6, truncate = "middle" })
+	table.insert(cols, { id = "open", head = "", priority = 5 })
+	return cols
+end
 
 local function render(out: Output): Node
+	-- A review listing is about other people's PRs, so name their authors.
+	local reviewing = out.role == "reviewRequested"
 	local head: Spans = {
-		ui.span("Open PRs from ", "muted"),
+		ui.span(if reviewing then "Open PRs awaiting review from " else "Open PRs from ", "muted"),
 		ui.span(out.user, "strong"),
 		ui.span(" in ", "muted"),
 		ui.span(`{out.owner}/{out.repo}`, "strong"),
@@ -182,17 +220,19 @@ local function render(out: Output): Node
 
 	local rows: { { Cell } } = {}
 	for _, pr in prs do
-		table.insert(rows, {
-			ui.link(`#{pr.number}`, pr.url, "strong"),
-			titleCell(pr),
-			reviewCell(pr),
-			queueCell(pr),
-			branchCell(pr),
-			ui.link("open ↗", pr.url),
-		})
+		local row: { Cell } = { ui.link(`#{pr.number}`, pr.url, "strong"), titleCell(pr) }
+		if reviewing then
+			table.insert(row, ui.span(pr.author or "ghost", "mono"))
+		end
+		table.insert(row, reviewCell(pr))
+		table.insert(row, checksCell(pr))
+		table.insert(row, queueCell(pr))
+		table.insert(row, branchCell(pr))
+		table.insert(row, ui.link("open ↗", pr.url))
+		table.insert(rows, row)
 	end
 
-	return ui.card(head, { summary(prs), ui.table(COLS, rows) })
+	return ui.card(head, { summary(prs), ui.table(columns(reviewing), rows) })
 end
 
 -- Lens -----------------------------------------------------------------------
