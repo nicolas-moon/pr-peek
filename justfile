@@ -57,13 +57,21 @@ dist-build:
 dist-generate:
     dist generate
 
-# Tag and push a release, e.g. `just release-tag 0.2.0` (bump + commit Cargo.toml version first)
+# Prepend a CHANGELOG.md section for the commits since the last tag, e.g. `just changelog 0.6.0` (requires `brew install git-cliff`)
+changelog version:
+    git cliff --unreleased --tag "v{{version}}" --prepend CHANGELOG.md
+
+# Tag and push a release, e.g. `just release-tag 0.2.0` (bump Cargo.toml, run `just changelog`, and commit first)
 release-tag version:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo_version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
     if [[ "$cargo_version" != "{{version}}" ]]; then
         echo "Cargo.toml is at $cargo_version but you asked to tag {{version}}" >&2
+        exit 1
+    fi
+    if ! grep -q "^## \[{{version}}\]" CHANGELOG.md; then
+        echo "CHANGELOG.md has no '## [{{version}}]' section; run \`just changelog {{version}}\` first" >&2
         exit 1
     fi
     if [[ -n "$(git status --porcelain)" ]]; then
