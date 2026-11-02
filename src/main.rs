@@ -9,7 +9,10 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use reqwest::Client;
 
-use crate::{github::Role, output::Report};
+use crate::{
+    github::{PullRequest, Role, Sort},
+    output::Report,
+};
 
 #[derive(Parser)]
 #[command(
@@ -36,6 +39,15 @@ struct Args {
     #[arg(short, long)]
     reviewing: bool,
 
+    /// Only show PRs that are blocked: changes requested, failing checks,
+    /// or merge conflicts
+    #[arg(short, long)]
+    attention: bool,
+
+    /// Order the results (default: newest)
+    #[arg(long, default_value = "newest")]
+    sort: Sort,
+
     /// GitHub token. Falls back to GITHUB_TOKEN.
     #[arg(long, env = "GITHUB_TOKEN", hide_env_values = true)]
     token: Option<String>,
@@ -58,7 +70,11 @@ struct Args {
 #[derive(Subcommand)]
 enum SubCommand {
     /// Update pr-peek to the latest release
-    Update,
+    Update {
+        /// Only check for a newer release without updating
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[tokio::main]
@@ -66,12 +82,12 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     let client = Client::builder()
-        .user_agent("pr-scout")
+        .user_agent(github::user_agent())
         .build()
         .context("failed to create HTTP client")?;
 
-    if matches!(args.command, Some(SubCommand::Update)) {
-        return update::run(&client).await;
+    if let Some(SubCommand::Update { check }) = args.command {
+        return update::run(&client, check).await;
     }
 
     let target = target::resolve(args.targets, target::repo_from_git_remote)?;
@@ -87,15 +103,33 @@ async fn main() -> Result<()> {
         Role::Author
     };
 
-    let search = github::search_query(&target.owner, &target.repo, target.user.as_deref(), role);
+    let search = github::search_query(
+        &target.owner,
+        &target.repo,
+        target.user.as_deref(),
+        role,
+        args.sort,
+    );
     let result = github::search_pull_requests(&client, &token, &search).await?;
+
+    // `--attention` keeps only the PRs that are blocked.
+    let pull_requests: Vec<PullRequest> = if args.attention {
+        result
+            .pull_requests
+            .into_iter()
+            .filter(PullRequest::is_blocked)
+            .collect()
+    } else {
+        result.pull_requests
+    };
 
     let report = Report {
         owner: &target.owner,
         repo: &target.repo,
         user: target.user.as_deref().unwrap_or(&result.viewer),
         role,
-        pull_requests: &result.pull_requests,
+        attention: args.attention,
+        pull_requests: &pull_requests,
     };
 
     if args.json {
