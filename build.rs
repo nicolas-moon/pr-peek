@@ -6,7 +6,6 @@ fn git(args: &[&str]) -> Option<std::process::Output> {
 }
 
 fn main() {
-    // The target triple cargo builds for.
     let triple = std::env::var("TARGET").unwrap_or_default();
     println!("cargo:rustc-env=BUILD_TARGET={triple}");
 
