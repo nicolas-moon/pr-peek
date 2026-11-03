@@ -1,0 +1,50 @@
+# git-cliff config: https://git-cliff.org/docs/configuration
+#
+# `just changelog <version>` prepends one section for the commits since the
+# last tag. Earlier sections are never regenerated, so hand edits stick.
+# Commits on main are squash-merged PR titles in the imperative mood
+# ("Add …", "Fix …"), which is what the parsers below group by.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to pr-peek. Each section is generated from the commit \
+history by `just changelog <version>` and may be edited by hand.
+"""
+# `## [x.y.z] - date` is the heading dist's release-notes lookup matches.
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}
+- {{ commit.message | split(pat="\n") | first | trim }}\
+{% endfor %}
+{% endfor %}\
+"""
+# The body ends in exactly one newline; git-cliff adds the blank line after
+# the header, and the existing file supplies the one before older sections.
+trim = false
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+commit_preprocessors = [
+  # "(#3)" -> link to the PR
+  { pattern = '\(#([0-9]+)\)', replace = "([#${1}](https://github.com/nicolas-moon/pr-peek/pull/${1}))" },
+]
+# The HTML comments order the groups (Added, Changed, Fixed) and are
+# stripped from the rendered headings.
+commit_parsers = [
+  { message = "^Bump version", skip = true },
+  { message = "^Add", group = "<!-- 0 -->Added" },
+  { message = "^Fix", group = "<!-- 2 -->Fixed" },
+  { message = ".*", group = "<!-- 1 -->Changed" },
+]
+filter_commits = false
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"

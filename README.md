@@ -131,13 +131,20 @@ The plugin hooks shell spawning and sets `PR_PEEK_JSON=1` in every new Tern pane
 
 ## Releasing
 
-Releases are built by [dist](https://axodotdev.github.io/cargo-dist/) via `.github/workflows/release.yml`. Pushing a tag like `v0.2.0` builds binaries for every target in `dist-workspace.toml`, creates a GitHub release, and attaches the archives, checksums, and installer script.
+Releases are built by [dist](https://axodotdev.github.io/cargo-dist/) via `.github/workflows/release.yml`. Pushing a tag like `v0.2.0` builds binaries for every target in `dist-workspace.toml`, creates a GitHub release, and attaches the archives, checksums, and installer script. The release notes and title come from the matching `## [x.y.z]` section of [CHANGELOG.md](CHANGELOG.md).
 
 ```sh
-# 1. bump `version` in Cargo.toml, commit, push
-# 2. tag and push (fails if the tag doesn't match Cargo.toml)
+# 1. bump `version` in Cargo.toml and run `cargo build` to update Cargo.lock
+# 2. prepend the changelog section from the commits since the last tag,
+#    then edit the entries as needed (requires `brew install git-cliff`)
+just changelog 0.2.0
+# 3. commit and push
+# 4. tag and push (fails if the tag doesn't match Cargo.toml or the
+#    changelog has no section for it)
 just release-tag 0.2.0
 ```
+
+`just changelog` groups commits by their first word — `Add …` under Added, `Fix …` under Fixed, anything else under Changed — and skips `Bump version` commits; see `cliff.toml`. It only prepends, so hand edits to earlier sections are kept.
 
 The workflow's plan step also runs on pull requests, so a broken release config surfaces before you tag. After editing `dist-workspace.toml`, run `just dist-generate` to refresh the workflow file.
 
