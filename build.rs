@@ -10,8 +10,6 @@ fn main() {
     let triple = std::env::var("TARGET").unwrap_or_default();
     println!("cargo:rustc-env=BUILD_TARGET={triple}");
 
-    // The toolchain building this binary; cargo sets RUSTC to its rustc.
-    // "rustc 1.95.0 (hash date)" -> "1.95.0".
     let rustc_version = std::env::var_os("RUSTC")
         .as_deref()
         .and_then(|path| {
