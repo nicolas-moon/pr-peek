@@ -28,11 +28,6 @@ fn main() {
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=BUILD_RUSTC={rustc_version}");
 
-    // The commit this tree is at, marked when tracked files have uncommitted
-    // changes; "unknown" when there is no repository (e.g. a crates.io
-    // build). Untracked files are ignored: they cannot reach the binary
-    // without a tracked change, and release CI creates one in the checkout
-    // (`dist build > dist-manifest.json`) before cargo runs.
     let commit = git(&["rev-parse", "--short", "HEAD"])
         .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
         .filter(|commit| !commit.is_empty())
