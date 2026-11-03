@@ -57,7 +57,7 @@ dist-build:
 dist-generate:
     dist generate
 
-# Prepend a CHANGELOG.md section for the commits since the last tag, e.g. `just changelog 0.6.0` (requires `brew install git-cliff`)
+# Prepend a CHANGELOG.md section for the commits since the last tag, e.g. `just changelog 0.5.0` (requires `brew install git-cliff`)
 changelog version:
     git cliff --unreleased --tag "v{{version}}" --prepend CHANGELOG.md
 
