@@ -38,10 +38,10 @@ Require human review for:
 
 Approve only when the evidence supports a low-risk classification. When uncertain, require human review.
 
-## Shadow Mode
+## Action
 
-For this evaluation, do not actually approve, merge, or modify any pull request.
+When the criteria above indicate a low-risk change, submit a real GitHub PR review with **Approve**.
 
-Report whether the PR **WOULD APPROVE**, **REQUIRES REVIEW**, or **UNKNOWN**, with a brief explanation.
+When the change requires human review or the risk is unclear, submit a review with **Request changes** or **Comment**, and include a brief explanation.
 
-Post the assessment as a regular GitHub PR comment.
+Do not merge or modify the pull request itself.
