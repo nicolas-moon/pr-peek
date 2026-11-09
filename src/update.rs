@@ -149,7 +149,9 @@ fn make_executable(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub async fn run(client: &Client) -> Result<()> {
+/// With `check_only`, stop after the version check: report whether a newer
+/// release exists without downloading or replacing anything.
+pub async fn run(client: &Client, check_only: bool) -> Result<()> {
     let current = env!("CARGO_PKG_VERSION");
 
     // The releases API is public; a token is only used to raise rate
@@ -177,6 +179,15 @@ pub async fn run(client: &Client) -> Result<()> {
     if !is_newer_version(latest, current) {
         println!(
             "pr-peek {current} is up to date (latest release is {}.)",
+            release.tag_name
+        );
+
+        return Ok(());
+    }
+
+    if check_only {
+        println!(
+            "pr-peek {current} is out of date: latest release is {}. Run `pr-peek update` to upgrade.",
             release.tag_name
         );
 

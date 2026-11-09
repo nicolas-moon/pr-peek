@@ -2,33 +2,37 @@
 
 A fast, opinionated CLI for checking who has open pull requests where — no browser tabs required.
 
-Point it at a repo and a GitHub username — or just run it inside a checkout — and get back a clean table of every open PR that person has in flight: number, title, branch flow, link, draft status, review decision, CI checks, and merge queue position. Flip it around with `--reviewing` to see the PRs waiting on their review instead.
+Point it at a repo and a GitHub username — or just run it inside a checkout — and get back a clean table of every open PR that person has in flight: number, title, branch flow, how long it's been open, link, draft status, review decision, CI checks, merge conflicts, and merge queue position. Flip it around with `--reviewing` to see the PRs waiting on their review instead, or narrow it down with `--attention` to the ones that are blocked.
 
 ```
 $ pr-peek rust-lang rust ferris
 
 Open PRs from ferris in rust-lang/rust:
 
-╭────────┬───────────────────────────┬────────────────────────────────┬──────────────────────────────────────────────┬───────┬───────────────────┬───────────┬────────────────────╮
-│ number │ title                     │ branch                         │ link                                         │ draft │ review            │ checks    │ queue              │
-├────────┼───────────────────────────┼────────────────────────────────┼──────────────────────────────────────────────┼───────┼───────────────────┼───────────┼────────────────────┤
-│ #12345 │ Fix off-by-one in scanner │ ferris/fix-scanner → master    │ https://github.com/rust-lang/rust/pull/12345 │       │ ✓ approved        │ ✓ passing │ #2 awaiting checks │
-│ #12350 │ WIP: refactor lexer       │ ferris/lexer-refactor → master │ https://github.com/rust-lang/rust/pull/12350 │ ✓     │ ○ review required │ ✗ failing │                    │
-╰────────┴───────────────────────────┴────────────────────────────────┴──────────────────────────────────────────────┴───────┴───────────────────┴───────────┴────────────────────╯
+╭────────┬───────────────────────────┬────────────────────────────────┬─────┬──────────────────────────────────────────────┬───────┬───────────────────┬───────────┬─────────────┬────────────────────╮
+│ number │ title                     │ branch                         │ age │ link                                         │ draft │ review            │ checks    │ merge       │ queue              │
+├────────┼───────────────────────────┼────────────────────────────────┼─────┼──────────────────────────────────────────────┼───────┼───────────────────┼───────────┼─────────────┼────────────────────┤
+│ #12345 │ Fix off-by-one in scanner │ ferris/fix-scanner → master    │ 3d  │ https://github.com/rust-lang/rust/pull/12345 │       │ ✓ approved        │ ✓ passing │             │ #2 awaiting checks │
+│ #12350 │ WIP: refactor lexer       │ ferris/lexer-refactor → master │ 12d │ https://github.com/rust-lang/rust/pull/12350 │ ✓     │ ○ review required │ ✗ failing │ ✗ conflicts │                    │
+╰────────┴───────────────────────────┴────────────────────────────────┴─────┴──────────────────────────────────────────────┴───────┴───────────────────┴───────────┴─────────────┴────────────────────╯
 ```
 
 ## Features
 
 - **Review status** — shows GitHub's overall review decision for each PR: `✓ approved`, `○ review required`, or `✗ changes requested`. Blank when the repo has no required-review rule and nobody has reviewed yet.
 - **CI checks** — the combined status of each PR's latest commit: `✓ passing`, `✗ failing`, or `● pending`. Blank when the commit has no checks or statuses.
+- **Merge conflicts** — `✗ conflicts` when the PR's branches can't currently be merged (blank when they can; `? unknown` briefly, while GitHub is computing it after a push).
+- **Age and staleness** — how long each PR has been open (`3d`, `5w`, `2y`), with the title dimmed once a PR has gone without activity for more than 14 days.
 - **Merge queue position** — if a PR is sitting in a [merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue), shows its position and state (`#3 queued`, `#1 awaiting checks`, `#1 mergeable`, `unmergeable`, `locked`).
 - **Review queue** — `--reviewing` lists open PRs waiting on the user's review (requested directly or through a team), with an `author` column.
+- **Blocked-only view** — `--attention` (`-a`) shows only the open PRs that are blocked: changes requested, failing checks, or merge conflicts.
+- **Sort order** — newest first by default; `--sort oldest` or `--sort updated` (most recently active first) for the rest.
 - **Smart defaults** — run it inside a checkout and it picks the repo from your git remote; leave out the user and it shows your own PRs.
 - **Zero-config auth** — reuses your `gh` CLI token automatically, or set `GITHUB_TOKEN` yourself.
 - **Handles pagination** — walks every page of results, so it works on repos with hundreds of open PRs.
 - **Case-insensitive matching** — `ferris`, `Ferris`, and `FERRIS` all match the same user.
 - **Readable output** — a clean, aligned table instead of raw JSON, with color and clickable links in a terminal.
-- **Self-update** — `pr-peek update` fetches the latest release, verifies its published checksum, and replaces the binary in place.
+- **Self-update** — `pr-peek update` fetches the latest release, verifies its published checksum, and replaces the binary in place. `pr-peek update --check` just reports whether a newer release exists.
 
 ## Install
 
@@ -66,6 +70,8 @@ pr-peek update
 
 This checks the [latest GitHub release](https://github.com/nicolas-moon/pr-peek/releases), verifies the archive against its published SHA-256 checksum, and replaces the running binary in place. No token is needed (the releases API is public). It works for binaries installed with the installer script or `cargo install`; if the binary lives in a directory you don't own (e.g. `/usr/local/bin`), re-run with `sudo`.
 
+To find out whether a newer release exists without updating, run `pr-peek update --check`.
+
 ## Usage
 
 ```sh
@@ -90,7 +96,20 @@ pr-peek -r                      # PRs waiting on your review here
 pr-peek rust-lang rust ferris -r
 ```
 
-Add `--json` for machine-readable output (the raw PR data as pretty-printed JSON, including author, review, CI check, and merge queue fields, plus a `role` of `author` or `reviewRequested`) — handy for scripts and pipelines:
+Add `--attention` (`-a`) to show only the open PRs that are blocked — changes requested, failing checks, or merge conflicts:
+
+```sh
+pr-peek -a                      # what's stuck here
+pr-peek rust-lang rust ferris -a
+```
+
+Results are newest first by default. `--sort oldest` lists the oldest PRs first, and `--sort updated` lists the most recently active first:
+
+```sh
+pr-peek --sort oldest
+```
+
+Add `--json` for machine-readable output (the raw PR data as pretty-printed JSON, including author, review, mergeable, CI check, and merge queue fields, plus `createdAt`/`updatedAt`, a `role` of `author` or `reviewRequested`, and an `attention` flag mirroring `--attention`) — handy for scripts and pipelines:
 
 ```sh
 pr-peek rust-lang rust ferris --json
@@ -146,3 +165,4 @@ macOS binaries are signed with a Developer ID certificate using the `CODESIGN_ID
 ## License
 
 Released under the [MIT License](LICENSE).
+
