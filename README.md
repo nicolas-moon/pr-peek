@@ -165,3 +165,4 @@ macOS binaries are signed with a Developer ID certificate using the `CODESIGN_ID
 ## License
 
 Released under the [MIT License](LICENSE).
+
