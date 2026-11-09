@@ -75,7 +75,7 @@ To find out whether a newer release exists without updating, run `pr-peek update
 ## Usage
 
 ```sh
-pr-peek [<owner> <repo>] [<user>]
+pr-peek [OPTIONS] [<owner> <repo>] [<user>]
 ```
 
 For example:
