@@ -14,7 +14,7 @@ const GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
 
 /// Search is used (rather than `repository.pullRequests`) so GitHub filters
 /// by author or requested reviewer server-side. `viewer` names the token's
-/// owner, which stands in for an omitted user.
+/// owner which stands in for an omitted user.
 const PULL_REQUESTS_QUERY: &str = r#"
 query($q: String!, $after: String) {
   viewer { login }
